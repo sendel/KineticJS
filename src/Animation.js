@@ -1,3 +1,80 @@
+    /* Yavorovsky M.A. 2013 VIOLONIX(C)
+     * Not stopped animation while tab of browser is hidden.
+     * Against 'requestAnimationFrame', used 'setTimeout' while tab hidden.
+     * 
+     * 'setTimeout' delay minimum 1000 ms (1s) while tab hidden! If you need smallest animation than 1000 ms, 
+     * try set Tween or Sprite to last position when tab hidden. 
+     * 
+     */
+    
+    
+    function getHidden(){
+    	var hidden, visibilityChange; 
+    	if (typeof document.hidden !== "undefined") { // Opera 12.10 and Firefox 18 and later support 
+    	    hidden = "hidden";
+    	} else if (typeof document.mozHidden !== "undefined") {
+    	    hidden = "mozHidden";
+    	} else if (typeof document.msHidden !== "undefined") {
+    	    hidden = "msHidden";
+    	} else if (typeof document.webkitHidden !== "undefined") {
+    	    hidden = "webkitHidden";
+    	}
+    	else
+    		{
+    			return true;
+    		}
+    	return document[hidden];
+    	
+    }
+    
+    
+    function setVisibleListener(callback){
+    	var visibilityChange =""; 
+    	if (typeof document.hidden !== "undefined") { // Opera 12.10 and Firefox 18 and later support 
+    	    visibilityChange = "visibilitychange";
+    	} else if (typeof document.mozHidden !== "undefined") {
+    	    visibilityChange = "mozvisibilitychange";
+    	} else if (typeof document.msHidden !== "undefined") {
+    	    visibilityChange = "msvisibilitychange";
+    	} else if (typeof document.webkitHidden !== "undefined") {
+    	    visibilityChange = "webkitvisibilitychange";
+    	}
+    	if(visibilityChange!=""){
+    		document.addEventListener(visibilityChange, callback, false);
+    	}
+    	
+    	
+    }
+    
+    function removeVisibleListener(callback){
+    	var visibilityChange =""; 
+    	if (typeof document.hidden !== "undefined") { // Opera 12.10 and Firefox 18 and later support 
+    	    visibilityChange = "visibilitychange";
+    	} else if (typeof document.mozHidden !== "undefined") {
+    	    visibilityChange = "mozvisibilitychange";
+    	} else if (typeof document.msHidden !== "undefined") {
+    	    visibilityChange = "msvisibilitychange";
+    	} else if (typeof document.webkitHidden !== "undefined") {
+    	    visibilityChange = "webkitvisibilitychange";
+    	}
+    	if(visibilityChange!=""){
+    		document.removeEventListener(visibilityChange, callback, false);
+    	}
+    	
+    	
+    }
+    
+    var kinetic_anim_stack = []; //stack for running animations
+    function AnimationEvent(){
+    	for(var i = 0; i < kinetic_anim_stack.length; i++ )
+    		kinetic_anim_stack[i].self.update.call(kinetic_anim_stack[i].self);
+    		
+    }
+    
+    setVisibleListener(AnimationEvent);
+
+
+
 (function() {
     /**
      * Animation constructor.  A stage is used to contain multiple layers and handle
@@ -118,6 +195,7 @@
             this.stop();
             this.frame.timeDiff = 0;
             this.frame.lastTime = new Date().getTime();
+	    kinetic_anim_stack.push({self:this});
             Kinetic.Animation._addAnimation(this);
         },
         /**
@@ -126,6 +204,13 @@
          * @memberof Kinetic.Animation.prototype
          */
         stop: function() {
+		var _self = this;
+        	for(var i = 0; i< kinetic_anim_stack.length; i++){
+        		if(kinetic_anim_stack[i].self.id==_self.id){
+        			kinetic_anim_stack.splice(i,1);
+        			break;
+        		}
+        	}
             Kinetic.Animation._removeAnimation(this);
         },
         _updateFrameObject: function(time) {
@@ -133,6 +218,11 @@
             this.frame.lastTime = time;
             this.frame.time += this.frame.timeDiff;
             this.frame.frameRate = 1000 / this.frame.timeDiff;
+        },
+        update: function(){
+        	console.log('update: ' + getHidden());
+        	//if(getHidden())
+        		Kinetic.Animation._animationOnce();
         }
     };
     Kinetic.Animation.animations = [];
@@ -205,6 +295,21 @@
             this.animRunning = false;
         }
     };
+    
+    Kinetic.Animation._animationOnce = function() {
+        var that = this;
+        if(this.animations.length > 0) {
+            this._runFrames();
+            setFRAF(function() {
+                that._animationOnce();
+            });
+
+        }
+        else {
+            this.animRunning = false;
+        }
+    };
+    
     Kinetic.Animation._handleAnimation = function() {
         var that = this;
         if(!this.animRunning) {
@@ -218,16 +323,52 @@
             || window.mozRequestAnimationFrame 
             || window.oRequestAnimationFrame 
             || window.msRequestAnimationFrame 
-            || FRAF;
+            || setFRAF;
     })();
 
-    function FRAF(callback) {
-        window.setTimeout(callback, 1000 / 60);
+    function setFRAF(callback){
+    	far_cb_stack.push(callback);
+    	if(!tm_startded) FRAF(this);
+    }
+    
+    
+    var far_cb_stack = [];
+    var tm_startded = false;
+    
+    function FRAF(anim) {
+    	//console.log('FRAF:start');
+    	tm_startded = true;
+    	var that = anim;
+    	cit = window.setTimeout(function(){
+
+        	if(far_cb_stack.length==0){
+        		//nothing, stop while no need
+        		//console.log('FRAF:ended');
+        		tm_startded = false;
+        		return; 
+        	}
+        	//console.log(far_cb_stack);
+        	var cb_stack = far_cb_stack.slice(0);
+        	far_cb_stack = [];
+        	while(cb_stack.length){
+        		var cb = cb_stack.pop(); 
+        		cb.call();
+        	}
+        	FRAF(that);
+        }, 1000 / 60);
     }
 
+
     Kinetic.Animation.requestAnimFrame = function(callback) {
-        var raf = Kinetic.DD && Kinetic.DD.isDragging ? FRAF : RAF;
-        raf(callback);
+        var raf = Kinetic.DD && Kinetic.DD.isDragging ? FRAF : setFRAF;
+        if(getHidden())
+        {
+        	setFRAF(callback);
+        }
+        else
+        {
+        	raf(callback);
+        }
     };
     
     var moveTo = Kinetic.Node.prototype.moveTo;
