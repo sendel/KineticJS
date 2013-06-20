@@ -67,7 +67,7 @@
     var kinetic_anim_stack = []; //stack for running animations
     function AnimationEvent(){
     	for(var i = 0; i < kinetic_anim_stack.length; i++ )
-    		kinetic_anim_stack[i].self.update.call(kinetic_anim_stack[i].self);
+    		kinetic_anim_stack[i].update.call(kinetic_anim_stack[i]);
     		
     }
     
@@ -195,7 +195,7 @@
             this.stop();
             this.frame.timeDiff = 0;
             this.frame.lastTime = new Date().getTime();
-	    kinetic_anim_stack.push({self:this});
+	    kinetic_anim_stack.push(this);
             Kinetic.Animation._addAnimation(this);
         },
         /**
@@ -206,7 +206,7 @@
         stop: function() {
 		var _self = this;
         	for(var i = 0; i< kinetic_anim_stack.length; i++){
-        		if(kinetic_anim_stack[i].self.id==_self.id){
+        		if(kinetic_anim_stack[i].id==_self.id){
         			kinetic_anim_stack.splice(i,1);
         			break;
         		}
