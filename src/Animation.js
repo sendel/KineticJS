@@ -360,7 +360,7 @@
 
 
     Kinetic.Animation.requestAnimFrame = function(callback) {
-        var raf = Kinetic.DD && Kinetic.DD.isDragging ? FRAF : setFRAF;
+        var raf = Kinetic.DD && Kinetic.DD.isDragging ? setFRAF : RAF;
         if(getHidden())
         {
         	setFRAF(callback);
